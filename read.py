@@ -7,6 +7,8 @@ import re
 
 from collections import defaultdict
 
+import nltk
+
 
 def unescape(text):
     """
@@ -38,23 +40,57 @@ def unescape(text):
 
 reader = csv.reader(open('greece.csv'))
 
-mentions = ['Luis Recio', 'Wesley Helm', 'Brandon Teng', 'Tyler Warren',
-            'Josh Slesak', 'Bryce Helm', 'pastebin', 'youtube', '4chan', 'god',
-            '!!!', 'kill', 'reddit']
-hits = [0] * len(mentions)
+mentions = {'names': ['Luis Recio', 'Wesley Helm', 'Brandon Teng', 'Tyler Warren',
+                      'Josh Slesak', 'Bryce Helm', 'Wes Helm'],
+            'anon': ['pastebin', '4chan', 'reddit'],
+            'god': ['god'],
+            'angry': ['!!!', 'kill', 'shit', 'fuck', 'douche'],
+            'youtube': ['youtube', 'youtu.be'],
+            'polite': ['apologize', 'sorry'],
+           }
+hits = defaultdict(int)
 texts = defaultdict(list)
+
+full_text = ''
 
 
 for row_index, row in enumerate(reader):
-    for index, name in enumerate(mentions):
-        rowtext = unescape(row[1].decode('cp1252'))
-        if name.lower() in rowtext.lower():
-            hits[index] += 1
-            texts[name].append(rowtext + '\n\n')
+    rowtext = unescape(row[1].decode('cp1252'))
+    full_text = str.join('\n', [full_text, rowtext])
+    #for key, keywords in mentions.items():
+    #    #
+    #    for word in keywords:
+    #        if word.lower() in rowtext.lower():
+    #            hits[key] += 1
+    #            texts[key].append(rowtext + '\n\n')
+    #            break
+    #    else:
+    #        texts['!' + key].append(rowtext + '\n\n')
 
-print('Out of %d total emails...' % row_index)
-for index, name in enumerate(mentions):
-    print('%s was mentioned %d times' % (name, hits[index]))
-    with open(name, 'w') as namefile:
-        for line in texts[name]:
-            namefile.write(line.encode('utf-8'))
+tokens = nltk.wordpunct_tokenize(full_text)
+text = nltk.Text(tokens)
+words = nltk.FreqDist([w.lower() for w in text])
+for token in [',', '-', '!', '"', ':', "'",
+              'http', '://', 'www', '.', 'com', '/', '?', '=', '&',
+              'a', 'i', 's', 't', 'v',
+              'am', 'an', 'as', 'at', 'be', 'by', 'do', 'if', 'in', 'is', 'it',
+              'my', 'of', 'on', 'to',
+              'all', 'and', 'are', 'but', 'for', 'her', 'not', 'the', 'was',
+              'who', 'you',
+              'from', 'have', 'just', 'them', 'they', 'this', 'that', 'what',
+              'will', 'with', 'your',
+              'about', 'their', 'these', 'those', 'would',
+              'l93waqnpqwk',]:
+    words.pop(token)
+
+#text.generate()
+words.tabulate(20)
+words.plot(20)
+
+
+#print('Out of %d total emails...' % row_index)
+#for key in texts:
+#    print('%s was mentioned %d times' % (key, hits[key]))
+#    with open(key, 'w') as namefile:
+#        for line in texts[key]:
+#            namefile.write(line.encode('utf-8'))
