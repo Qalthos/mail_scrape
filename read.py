@@ -3,12 +3,18 @@
 import htmlentitydefs
 import codecs
 import csv
+import json
 import re
+import string
+import sys
 
 from collections import defaultdict
 
 import nltk
+from nltk.tag.simplify import simplify_tag
+from nltk.tokenize import WhitespaceTokenizer, WordPunctTokenizer, TreebankWordTokenizer
 
+token_keys = ['whitespace', 'wordpunct', 'treebank']
 
 def unescape(text):
     """
@@ -38,59 +44,67 @@ def unescape(text):
     return re.sub("&#?\w+;", fixup, text)
 
 
-reader = csv.reader(open('greece.csv'))
+def open_and_tokenize():
+    reader = csv.reader(open('greece.csv'))
 
-mentions = {'names': ['Luis Recio', 'Wesley Helm', 'Brandon Teng', 'Tyler Warren',
-                      'Josh Slesak', 'Bryce Helm', 'Wes Helm'],
-            'anon': ['pastebin', '4chan', 'reddit'],
-            'god': ['god'],
-            'angry': ['!!!', 'kill', 'shit', 'fuck', 'douche'],
-            'youtube': ['youtube', 'youtu.be'],
-            'polite': ['apologize', 'sorry'],
-           }
-hits = defaultdict(int)
-texts = defaultdict(list)
+    full_text = ''
+    for row_index, row in enumerate(reader):
+        rowtext = unescape(row[1].decode('cp1252'))
+        full_text = str.join('\n', [full_text, rowtext])
 
-full_text = ''
+    tokenizers = {'whitespace': WhitespaceTokenizer(),
+                  'wordpunct': WordPunctTokenizer(),
+                  'treebank': TreebankWordTokenizer(),
+                 }
 
-
-for row_index, row in enumerate(reader):
-    rowtext = unescape(row[1].decode('cp1252'))
-    full_text = str.join('\n', [full_text, rowtext])
-    #for key, keywords in mentions.items():
-    #    #
-    #    for word in keywords:
-    #        if word.lower() in rowtext.lower():
-    #            hits[key] += 1
-    #            texts[key].append(rowtext + '\n\n')
-    #            break
-    #    else:
-    #        texts['!' + key].append(rowtext + '\n\n')
-
-tokens = nltk.wordpunct_tokenize(full_text)
-text = nltk.Text(tokens)
-words = nltk.FreqDist([w.lower() for w in text])
-for token in [',', '-', '!', '"', ':', "'",
-              'http', '://', 'www', '.', 'com', '/', '?', '=', '&',
-              'a', 'i', 's', 't', 'v',
-              'am', 'an', 'as', 'at', 'be', 'by', 'do', 'if', 'in', 'is', 'it',
-              'my', 'of', 'on', 'to',
-              'all', 'and', 'are', 'but', 'for', 'her', 'not', 'the', 'was',
-              'who', 'you',
-              'from', 'have', 'just', 'them', 'they', 'this', 'that', 'what',
-              'will', 'with', 'your',
-              'about', 'their', 'these', 'those', 'would',
-              'l93waqnpqwk',]:
-    words.pop(token)
-
-#text.generate()
-words.tabulate(20)
-words.plot(20)
+    token_dict = dict()
+    for filename, tokenizer in tokenizers.items():
+        token_dict[filename] = tokenizer.tokenize(full_text)
+        with open(filename + '.json', 'w') as file_:
+            json.dump(token_dict[filename], file_)
 
 
-#print('Out of %d total emails...' % row_index)
-#for key in texts:
-#    print('%s was mentioned %d times' % (key, hits[key]))
-#    with open(key, 'w') as namefile:
-#        for line in texts[key]:
-#            namefile.write(line.encode('utf-8'))
+def parse_and_simplify():
+    for filename in token_keys:
+        with open(filename + '.json') as file_:
+            tokens = json.load(file_)
+        tagged = nltk.pos_tag(tokens)
+        print("Tagged")
+        simplified = [(word, simplify_tag(tag)) for word, tag in tagged]
+        print("Simplified")
+
+        with open(filename + '_parsed.json', 'w') as file_:
+            json.dump(tagged, file_)
+        with open(filename + '_simple.json', 'w') as file_:
+            json.dump(simplified, file_)
+
+        print(filename + ' has been parsed')
+
+
+def pull_from_json(parse_type, simple=False):
+    filename = parse_type + ('_simple' if simple else '_parsed') + '.json'
+    with open(filename) as file_:
+        return json.load(file_)
+
+
+def clean_up_tokens(tokens):
+    desired_tags = ['J', 'N', 'V']
+    words = nltk.FreqDist([w[0].lower().rstrip(string.punctuation) for w in tokens
+                           if w[1] in desired_tags and len(w[0]) >= 7])
+
+    return words
+
+
+if __name__ == '__main__':
+    if 'retoken' in sys.argv:
+        open_and_tokenize()
+        print("Tokenized")
+
+    if 'reparse' in sys.argv:
+        parse_and_simplify()
+
+    for parse_type in token_keys:
+        print(parse_type)
+        words = clean_up_tokens(pull_from_json(parse_type, True))
+        words.tabulate(30)
+        words.plot(30)
