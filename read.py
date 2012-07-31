@@ -61,7 +61,7 @@ def open_and_tokenize():
     reader = csv.reader(open('greece.csv'))
 
     full_text = ''
-    for row_index, row in enumerate(reader):
+    for row in reader:
         rowtext = unescape(row[1].decode('cp1252'))
         full_text = str.join('\n', [full_text, rowtext])
 
@@ -69,11 +69,39 @@ def open_and_tokenize():
     with open(tokenizer['name'] + '.json', 'w') as file_:
         json.dump(tokens, file_, indent=2)
 
-    token_dict = dict()
-    for filename, tokenizer in tokenizers.items():
-        token_dict[filename] = tokenizer.tokenize(full_text)
-        with open(filename + '.json', 'w') as file_:
-            json.dump(token_dict[filename], file_)
+
+def open_and_store():
+    """Dump the csv to rows of email bodies."""
+
+    reader = csv.DictReader(open('greece.csv'))
+    rows = []
+    for row in reader:
+        rows.append((row['id'], unescape(row['comments'].decode('cp1252'))))
+
+    p, n = 0, 0
+    trained = {}
+    while not (p >= 5 and n >= 5):
+        id_, line = random.choice(rows)
+        if id_ in trained:
+            continue
+
+        print(line)
+
+        key = ''
+        while key not in ['p', 'n', 's']:
+            key = raw_input('(p/n/s)? ')
+
+        if not key == 's':
+            trained[id_] = (line, key)
+            if key == 'p':
+                p += 1
+            else:
+                n += 1
+
+    with open('training.json', 'w') as train_file:
+        json.dump(trained, train_file, indent=2)
+
+    return trained
 
 
 def parse_and_simplify():
@@ -139,8 +167,45 @@ if __name__ == '__main__':
         with open('training.json') as train_file:
             trained = json.load(train_file)
 
-    for parse_type in token_keys:
-        print(parse_type)
-        words = clean_up_tokens(pull_from_json(parse_type, True))
-        words.tabulate(30)
-        words.plot(30)
+    texts = []
+    for (words, sentiment) in trained.values():
+        words_filtered = [e.lower().strip(string.punctuation)
+                          for e in words.split() if len(e) >= 5]
+        texts.append((words_filtered, sentiment))
+
+    features = set()
+    for words, sentiment in texts:
+        features.update(words)
+
+    def extract_features(document):
+        words = set(document)
+        feature_dict = {}
+        for word in features:
+            feature_dict['contains(%s)' % word] = (word in words)
+        return feature_dict
+
+    training_set = nltk.classify.util.apply_features(extract_features, texts)
+    classifier = nltk.NaiveBayesClassifier.train(training_set)
+    classifier.show_most_informative_features(10)
+
+    reader = csv.DictReader(open('greece.csv'))
+    p, n = 0, 0
+    for row in reader:
+        if row['id'] in trained:
+            continue
+
+        row_text = unescape(row['comments'].decode('cp1252'))
+        row_list = [e.lower().strip(string.punctuation)
+                    for e in row_text.split() if len(e) >= 5]
+        class_ = classifier.classify(extract_features(row_list))
+        if class_ == 'p':
+            p += 1
+            class_ = 'polite'
+            #if p % 20 == 0:
+            #    print('\n' + row['id'] + ' ' + class_ + ' v')
+            #    print(row_text)
+        else:
+            n += 1
+            class_ = 'aggressive'
+
+    print((p, n))
