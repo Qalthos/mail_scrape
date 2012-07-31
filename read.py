@@ -4,18 +4,17 @@ This script reads a CSV file containing a large number of emails and parses
 each for common language and tone.
 """
 
-import htmlentitydefs
-import codecs
 import argparse
 import csv
+import htmlentitydefs
 import json
+import random
 import re
 import string
 import sys
 
-from collections import defaultdict
-
 import nltk
+nltk.download('book')
 from nltk.tag.simplify import simplify_tag
 from nltk.tokenize import TreebankWordTokenizer
 
@@ -136,7 +135,8 @@ def pull_from_json(parse_type, simple=False):
 def clean_up_tokens(tokens):
     """Take tagged words and filter out nonessential or common words,"""
     desired_tags = ['J', 'N', 'V']
-    words = nltk.FreqDist([w[0].lower().rstrip(string.punctuation) for w in tokens
+    words = nltk.FreqDist([w[0].lower().rstrip(string.punctuation)
+                           for w in tokens
                            if w[1] in desired_tags and len(w[0]) >= 7])
 
     return words
