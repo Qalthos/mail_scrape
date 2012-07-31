@@ -1,7 +1,8 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python2.7
 
 import htmlentitydefs
 import codecs
+import argparse
 import csv
 import json
 import re
@@ -96,12 +97,29 @@ def clean_up_tokens(tokens):
 
 
 if __name__ == '__main__':
-    if 'retoken' in sys.argv:
+    parser = argparse.ArgumentParser(description='Perfom analysis on a ' + \
+        'collection of text emails')
+    parser.add_argument('-g', dest='token', action='store_true',
+                       help='(re)generate the token set')
+    parser.add_argument('-p', dest='parse', action='store_true',
+                       help='(re)parse the token set')
+    parser.add_argument('-t', dest='train', action='store_true',
+                       help='(re)train the machine learner on the parsed tokens')
+
+    args = parser.parse_args()
+
+    if args.token:
         open_and_tokenize()
         print("Tokenized")
-
-    if 'reparse' in sys.argv:
+    if args.parse:
         parse_and_simplify()
+        print("Parsed")
+    if args.train:
+        print("Trained")
+        trained = open_and_store()
+    else:
+        with open('training.json') as train_file:
+            trained = json.load(train_file)
 
     for parse_type in token_keys:
         print(parse_type)
