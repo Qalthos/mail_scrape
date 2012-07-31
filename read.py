@@ -1,4 +1,8 @@
 #!/usr/bin/env python2.7
+"""
+This script reads a CSV file containing a large number of emails and parses
+each for common language and tone.
+"""
 
 import htmlentitydefs
 import codecs
@@ -46,6 +50,11 @@ def unescape(text):
 
 
 def open_and_tokenize():
+    """
+    Open the CSV file and tokenize the texts according to a number of
+    possible tokenizers.
+    """
+
     reader = csv.reader(open('greece.csv'))
 
     full_text = ''
@@ -66,6 +75,12 @@ def open_and_tokenize():
 
 
 def parse_and_simplify():
+    """
+    Take the tokenized text and tag each word according to what purpose it
+    fills in the sentence.  This is done both in a detailed and simplified
+    manner, for comparison.
+    """
+
     for filename in token_keys:
         with open(filename + '.json') as file_:
             tokens = json.load(file_)
@@ -83,12 +98,14 @@ def parse_and_simplify():
 
 
 def pull_from_json(parse_type, simple=False):
+    """Re-read stored tagged information."""
     filename = parse_type + ('_simple' if simple else '_parsed') + '.json'
     with open(filename) as file_:
         return json.load(file_)
 
 
 def clean_up_tokens(tokens):
+    """Take tagged words and filter out nonessential or common words,"""
     desired_tags = ['J', 'N', 'V']
     words = nltk.FreqDist([w[0].lower().rstrip(string.punctuation) for w in tokens
                            if w[1] in desired_tags and len(w[0]) >= 7])
