@@ -17,9 +17,12 @@ from collections import defaultdict
 
 import nltk
 from nltk.tag.simplify import simplify_tag
-from nltk.tokenize import WhitespaceTokenizer, WordPunctTokenizer, TreebankWordTokenizer
+from nltk.tokenize import TreebankWordTokenizer
 
-token_keys = ['whitespace', 'wordpunct', 'treebank']
+tokenizer = {
+    'name': 'treebank',
+    'obj': TreebankWordTokenizer(),
+}
 
 def unescape(text):
     """
@@ -62,10 +65,9 @@ def open_and_tokenize():
         rowtext = unescape(row[1].decode('cp1252'))
         full_text = str.join('\n', [full_text, rowtext])
 
-    tokenizers = {'whitespace': WhitespaceTokenizer(),
-                  'wordpunct': WordPunctTokenizer(),
-                  'treebank': TreebankWordTokenizer(),
-                 }
+    tokens = tokenizer['obj'].tokenize(full_text)
+    with open(tokenizer['name'] + '.json', 'w') as file_:
+        json.dump(tokens, file_, indent=2)
 
     token_dict = dict()
     for filename, tokenizer in tokenizers.items():
@@ -81,20 +83,19 @@ def parse_and_simplify():
     manner, for comparison.
     """
 
-    for filename in token_keys:
-        with open(filename + '.json') as file_:
-            tokens = json.load(file_)
-        tagged = nltk.pos_tag(tokens)
-        print("Tagged")
-        simplified = [(word, simplify_tag(tag)) for word, tag in tagged]
-        print("Simplified")
+    with open(tokenizer['name'] + '.json') as file_:
+        tokens = json.load(file_)
+    tagged = nltk.pos_tag(tokens)
+    print("Tagged")
+    simplified = [(word, simplify_tag(tag)) for word, tag in tagged]
+    print("Simplified")
 
-        with open(filename + '_parsed.json', 'w') as file_:
-            json.dump(tagged, file_)
-        with open(filename + '_simple.json', 'w') as file_:
-            json.dump(simplified, file_)
+    with open(tokenizer['name'] + '_parsed.json', 'w') as file_:
+        json.dump(tagged, file_, indent=2)
+    with open(tokenizer['name'] + '_simple.json', 'w') as file_:
+        json.dump(simplified, file_, indent=2)
 
-        print(filename + ' has been parsed')
+    print(tokenizer['name'] + ' has been parsed')
 
 
 def pull_from_json(parse_type, simple=False):
